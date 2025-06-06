@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, Optional
 import torch
 
@@ -10,9 +9,10 @@ from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorBase_V1, KVConnectorMetadata, KVConnectorRole
 )
 from vllm.logger import init_logger
-from vllm.v1.attention.backends.mla.common import MLACommonMetadata
 from vllm.v1.core.sched.output import SchedulerOutput
 from vllm.distributed.parallel_state import (get_world_group, get_tp_group)
+
+from vllm_ascend.attention.mla_v1 import AscendMLAMetadata
 
 if TYPE_CHECKING:
     from vllm.attention.backends.abstract import AttentionMetadata
@@ -192,7 +192,7 @@ class ChariotConnector(KVConnectorBase_V1):
             logger.warning("kvconnector calls start_load_kv, but the attention metadata is None, skip")
             return
         
-        is_mla_attn = isinstance(attn_metadata, MLACommonMetadata)
+        is_mla_attn = isinstance(attn_metadata, AscendMLAMetadata)
 
         for layer_name in forward_context.no_compile_layers:
             for req_meta in kvconnector_metadata.loading_requests:
@@ -232,7 +232,7 @@ class ChariotConnector(KVConnectorBase_V1):
             logger.warning("kvconnector calls save_kv_layer, but the attention metadata is None, skip")
             return
         
-        is_mla_attn = isinstance(attn_metadata, MLACommonMetadata)
+        is_mla_attn = isinstance(attn_metadata, AscendMLAMetadata)
         if is_mla_attn and self.tp_rank > 0: # type: ignore
             logger.debug(f"TP rank = {self.tp_rank} > 0 skips kv save for MLA models.")
             return
@@ -243,8 +243,7 @@ class ChariotConnector(KVConnectorBase_V1):
             return
 
         for req_meta in kvconnector_metadata.saving_requests:
-            seq_len = len(req_meta.slot_mapping)
-            if seq_len == 0:
+            if len(req_meta.slot_mapping) == 0:
                 return
             kv_cache = ChariotConnector.extract_kv_from_layer(kv_layer, req_meta.slot_mapping, is_mla_attn)
 

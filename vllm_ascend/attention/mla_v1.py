@@ -9,6 +9,9 @@ from vllm.attention.backends.abstract import (AttentionBackend, AttentionLayer,
                                               MLAAttentionImpl)
 from vllm.attention.backends.utils import PAD_SLOT_ID
 from vllm.config import get_current_vllm_config
+from vllm.distributed.kv_transfer import (get_kv_transfer_group,
+                                          has_kv_transfer_group,
+                                          is_v1_kv_transfer_group)
 from vllm.model_executor.layers.linear import (LinearBase,
                                                UnquantizedLinearMethod)
 
@@ -826,7 +829,11 @@ class AscendMLAImpl(MLAAttentionImpl):
             output[num_decode_tokens:] = self._forward_prefill(
                 prefill_q, prefill_k_c_normed, prefill_k_pe, kv_cache,
                 attn_metadata)
+            if has_kv_transfer_group() and is_v1_kv_transfer_group():
+                get_kv_transfer_group().save_kv_layer(layer.layer_name, kv_cache, attn_metadata)
         if has_decode:
+            if has_kv_transfer_group() and is_v1_kv_transfer_group():
+                get_kv_transfer_group().wait_for_layer_load(layer.layer_name)
             if self.running_in_graph:
                 return self._forward_decode(decode_ql_nope, decode_q_pe,
                                             decode_k_nope, decode_k_pe,
