@@ -156,7 +156,7 @@ class ChariotConnector(KVConnectorBase_V1):
         if role == KVConnectorRole.WORKER:
             self.device = get_world_group().local_rank
             self.tp_rank = get_tp_group().rank
-            self.kv_store = ChariotKvcacheStore()
+            self.kv_store = ChariotKvcacheStore(device_id=self.device)
 
         self.saving_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
         self.loading_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
