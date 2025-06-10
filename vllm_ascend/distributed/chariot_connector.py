@@ -2,8 +2,6 @@ import os
 from typing import TYPE_CHECKING, Dict, Optional
 import torch
 
-from dllm.cpp_ext.kvc import KvcFuture, KvcStore
-
 from vllm.config import VllmConfig
 from vllm.distributed.kv_transfer.kv_connector.v1.base import (
     KVConnectorBase_V1, KVConnectorMetadata, KVConnectorRole
@@ -18,6 +16,8 @@ if TYPE_CHECKING:
     from vllm.attention.backends.abstract import AttentionMetadata
     from vllm.forward_context import ForwardContext
     from vllm.v1.request import Request
+
+from chariot_client import ChariotClient
 
 logger = init_logger(f"vllm.{__name__}")
 
@@ -70,7 +70,7 @@ class ChariotConnectorMetadata(KVConnectorMetadata):
 
 class ChariotFutureWrapper:
     def __init__(self,
-                 future: KvcFuture,
+                 future,
                  kvcache_id: str,
                  dst_kv_layer: torch.Tensor,
                  src_kv_layer: torch.Tensor,
@@ -86,6 +86,9 @@ class ChariotFutureWrapper:
         self.timeout = timeout
 
     def wait_for_load(self, timeout: Optional[int] = None):
+        if not self.future: # synchronous load
+            ChariotConnector.inject_kv_into_layer(self.dst_kv_layer, self.src_kv_layer, self.slot_mapping, self.is_mla)
+            return
         if timeout is None:
             timeout = self.timeout
         try:
@@ -100,6 +103,8 @@ class ChariotFutureWrapper:
             logger.error(f"kvcache with id {self.kvcache_id} wait for load error: {ret.error_message}")
 
     def wait_for_save(self, timeout: Optional[int] = None):
+        if not self.future: # synchronous save
+            return
         if timeout is None:
             timeout = self.timeout
         try:
@@ -117,20 +122,27 @@ class ChariotFutureWrapper:
 
 
 class ChariotKvcacheStore:
-    def __init__(self, connection_timeout: int = CHARIOT_CONNECTION_TIMEOUT):
+    def __init__(self, device_id: int ,connection_timeout: int = CHARIOT_CONNECTION_TIMEOUT):
         self.chariot_ds_worker_address = os.getenv("DS_WORKER_ADDR", None)
         assert self.chariot_ds_worker_address is not None, "Chariot-DS worker address got None, make sure environment $DS_WORKER_ADDR is set"
         logger.info(f"Chariot-DS worker address: {self.chariot_ds_worker_address}")
         self.ip, self.port = self.chariot_ds_worker_address.split(":")
+        self.device_id = device_id
         self.connection_timeout = connection_timeout
-        self.store = KvcStore()
-        self.store.init(self.ip, self.port, self.connection_timeout)
+        self.client = ChariotClient(host=self.ip, port=self.port, device_id=self.device_id)
+        self.client.init()
 
-    def async_load(self, kvcache_id: str, kv_tensor: torch.Tensor) -> KvcFuture:
-        return self.store.mget_tensors_h2d([kvcache_id], [kv_tensor])
+    def load(self, kvcache_id: str, kv_tensor: torch.Tensor):
+        return self.client.mget_h2d([kvcache_id], [kv_tensor])
     
-    def async_save(self, kvcache_id: str, kv_tensor: torch.Tensor) -> KvcFuture:
-        return self.store.mset_tensors_d2h([kvcache_id], [kv_tensor])
+    def save(self, kvcache_id: str, kv_tensor: torch.Tensor):
+        return self.client.mset_d2h([kvcache_id], [kv_tensor])
+    
+    def async_load(self, kvcache_id: str, kv_tensor: torch.Tensor):
+        return self.client.async_mget_h2d([kvcache_id], [kv_tensor])
+    
+    def async_save(self, kvcache_id: str, kv_tensor: torch.Tensor):
+        return self.client.async_mset_d2h([kvcache_id], [kv_tensor])
 
 
 class ChariotConnector(KVConnectorBase_V1):
@@ -206,7 +218,7 @@ class ChariotConnector(KVConnectorBase_V1):
                 kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
                 kv_holder = torch.zeros((2, seq_len, -1), dtype=kv_dtype, device=self.device)
 
-                future = self.kv_store.async_load(kvcache_id, kv_holder) # type: ignore
+                future = self.kv_store.load(kvcache_id, kv_holder) # type: ignore
                 chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_holder, req_meta.slot_mapping, is_mla_attn)
                 if req_meta.request_id not in self.loading_futures:
                     self.loading_futures[req_meta.request_id] = {}
@@ -256,7 +268,7 @@ class ChariotConnector(KVConnectorBase_V1):
             req_meta.set_mla(is_mla_attn)
             kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
 
-            future = self.kv_store.async_save(kvcache_id, kv_cache) # type: ignore
+            future = self.kv_store.save(kvcache_id, kv_cache) # type: ignore
             chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_cache, req_meta.slot_mapping, is_mla_attn)
             if req_meta.request_id not in self.saving_futures:
                 self.saving_futures[req_meta.request_id] = {}
