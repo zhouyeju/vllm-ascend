@@ -129,6 +129,8 @@ class ChariotKvcacheStore:
         self.ip, self.port = self.chariot_ds_worker_address.split(":")
         self.device_id = device_id
         self.connection_timeout = connection_timeout
+        if not isinstance(self.port, int):
+            self.port = int(self.port)
         self.client = ChariotClient(host=self.ip, port=self.port, device_id=self.device_id)
         self.client.init()
 
