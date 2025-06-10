@@ -146,8 +146,8 @@ class ChariotConnector(KVConnectorBase_V1):
             self.tp_rank = get_tp_group().rank
             self.kv_store = ChariotKvcacheStore()
 
-        self.saving_futures: Dict[str, ChariotFutureWrapper] = {}
-        self.loading_futures: Dict[str, ChariotFutureWrapper] = {}
+        self.saving_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
+        self.loading_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
         self.requests_waiting_for_load: Dict[str, Request] = {}
 
     @staticmethod
@@ -208,7 +208,9 @@ class ChariotConnector(KVConnectorBase_V1):
 
                 future = self.kv_store.async_load(kvcache_id, kv_holder) # type: ignore
                 chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_holder, req_meta.slot_mapping, is_mla_attn)
-                self.loading_futures[kvcache_id] = chariot_future_wrapper
+                if req_meta.request_id not in self.loading_futures:
+                    self.loading_futures[req_meta.request_id] = {}
+                self.loading_futures[req_meta.request_id][kvcache_id] = chariot_future_wrapper
 
     def wait_for_layer_load(self, layer_name: str) -> None:
         kvconnector_metadata: ChariotConnectorMetadata = self._get_connector_metadata() # type: ignore
@@ -216,10 +218,14 @@ class ChariotConnector(KVConnectorBase_V1):
             logger.warning("kvconnector calls wait_for_layer_load, but the kvconnector metadata is None, skip")
             return
         for req_meta in kvconnector_metadata.loading_requests:
+            if req_meta.request_id not in self.loading_futures:
+                logger.warning(f"request with id {req_meta.request_id} wait_for_layer_load failed to find future, skip")
+                continue
             kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
-            chariot_future_wrapper = self.loading_futures.pop(kvcache_id, None)
+            chariot_future_wrapper = self.loading_futures[req_meta.request_id].pop(kvcache_id, None)
             if chariot_future_wrapper:
                 chariot_future_wrapper.wait_for_load()
+                self.loading_futures.pop(req_meta.request_id, None)
             else:
                 logger.warning(f"kvcache with id {kvcache_id} wait_for_layer_load failed to find future, skip")
 
@@ -252,7 +258,9 @@ class ChariotConnector(KVConnectorBase_V1):
 
             future = self.kv_store.async_save(kvcache_id, kv_cache) # type: ignore
             chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_cache, req_meta.slot_mapping, is_mla_attn)
-            self.saving_futures[kvcache_id] = chariot_future_wrapper
+            if req_meta.request_id not in self.saving_futures:
+                self.saving_futures[req_meta.request_id] = {}
+            self.saving_futures[req_meta.request_id][kvcache_id] = chariot_future_wrapper
 
     def wait_for_save(self) -> None:
         kvconnector_metadata: ChariotConnectorMetadata = self._get_connector_metadata() # type: ignore
@@ -260,11 +268,14 @@ class ChariotConnector(KVConnectorBase_V1):
             logger.warning("kvconnector calls wait_for_layer_load, but the kvconnector metadata is None, skip")
             return
         for req_meta in kvconnector_metadata.saving_requests:
-            kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
-            chariot_future_wrapper = self.saving_futures.pop(kvcache_id, None)
-            if chariot_future_wrapper:
-                chariot_future_wrapper.wait_for_save()
-            else:
+            if req_meta.request_id not in self.saving_futures:
+                logger.warning(f"request with id {req_meta.request_id} wait_for_save failed to find future, skip")
+                continue
+            has_futures = False
+            for kvcache_id, chariot_future_wrapper in self.saving_futures[req_meta.request_id].items():
+                    chariot_future_wrapper.wait_for_save()
+                    has_futures = True
+            if not has_futures:
                 logger.warning(f"kvcache with id {kvcache_id} wait_for_save failed to find future, skip")
         for kvcache_id in self.saving_futures.keys():
             logger.warning(f"kvcache with id {kvcache_id} has a saving future left, but not in kvconnector metadata, ignore")
