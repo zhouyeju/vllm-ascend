@@ -1,4 +1,5 @@
 import os
+import math
 from typing import TYPE_CHECKING, Dict, Optional
 import torch
 
@@ -159,10 +160,7 @@ class ChariotConnector(KVConnectorBase_V1):
         if role == KVConnectorRole.WORKER:
             self.device = get_world_group().local_rank
             self.tp_rank = get_tp_group().rank
-            visible_devices = os.getenv("ASCEND_RT_VISIBLE_DEVICES", None)
-            if visible_devices is not None:
-                self.device = int(visible_devices.split(",")[self.device])
-            logger.info(f"ChariotConnector initialized with device={self.device} and is produer={self.is_producer}")
+            logger.info(f"ChariotConnector initialized with device={self.device} and is producer={self.is_producer}")
             self.kv_store = ChariotKvcacheStore(device_id=self.device)
 
         self.saving_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
@@ -223,7 +221,11 @@ class ChariotConnector(KVConnectorBase_V1):
 
                 req_meta.set_mla(is_mla_attn)
                 kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
-                kv_holder = torch.zeros((2, seq_len, -1), dtype=kv_dtype, device=self.device)
+                if is_mla_attn:
+                    kv_dim = math.prod(kv_layer.shape[2:])
+                else:
+                    kv_dim = math.prod(kv_layer.shape[3:])
+                kv_holder = torch.zeros((2, seq_len, kv_dim), dtype=kv_dtype, device=self.device)
 
                 future = self.kv_store.load(kvcache_id, kv_holder) # type: ignore
                 chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_holder, req_meta.slot_mapping, is_mla_attn)
