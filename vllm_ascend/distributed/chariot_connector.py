@@ -15,6 +15,7 @@ from vllm_ascend.attention.mla_v1 import AscendMLAMetadata
 if TYPE_CHECKING:
     from vllm.attention.backends.abstract import AttentionMetadata
     from vllm.forward_context import ForwardContext
+    from vllm.v1.core.kv_cache_manager import KVCacheBlocks
     from vllm.v1.request import Request
 
 from chariot_client import ChariotClient
@@ -301,7 +302,9 @@ class ChariotConnector(KVConnectorBase_V1):
         num_total_tokens = len(request.prompt_token_ids) - 1
         return num_total_tokens - num_computed_tokens, True
 
-    def update_state_after_alloc(self, request: "Request", num_external_tokens: int):
+    def update_state_after_alloc(self, request: "Request",
+                                 blocks: "KVCacheBlocks",
+                                 num_external_tokens: int):
         if not self. is_producer:
             logger.debug(f"request with id {request.request_id} updated state to waiting for kvcache load")
             self.requests_waiting_for_load[request.request_id] = request
