@@ -159,6 +159,9 @@ class ChariotConnector(KVConnectorBase_V1):
         if role == KVConnectorRole.WORKER:
             self.device = get_world_group().local_rank
             self.tp_rank = get_tp_group().rank
+            visible_devices = os.getenv("ASCEND_RT_VISIBLE_DEVICES", None)
+            if visible_devices is not None:
+                self.device = int(visible_devices.split(",")[self.device])
             logger.info(f"ChariotConnector initialized with device={self.device} and is produer={self.is_producer}")
             self.kv_store = ChariotKvcacheStore(device_id=self.device)
 
