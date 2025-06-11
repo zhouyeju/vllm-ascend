@@ -159,6 +159,7 @@ class ChariotConnector(KVConnectorBase_V1):
         if role == KVConnectorRole.WORKER:
             self.device = get_world_group().local_rank
             self.tp_rank = get_tp_group().rank
+            logger.info(f"ChariotConnector initialized with device={self.device} and is produer={self.is_producer}")
             self.kv_store = ChariotKvcacheStore(device_id=self.device)
 
         self.saving_futures: Dict[str, Dict[str, ChariotFutureWrapper]] = {}
@@ -292,8 +293,9 @@ class ChariotConnector(KVConnectorBase_V1):
                     has_futures = True
             if not has_futures:
                 logger.warning(f"kvcache with id {kvcache_id} wait_for_save failed to find future, skip")
-        for kvcache_id in self.saving_futures.keys():
-            logger.warning(f"kvcache with id {kvcache_id} has a saving future left, but not in kvconnector metadata, ignore")
+            self.saving_futures.pop(req_meta.request_id, None)
+        for request_id in self.saving_futures.keys():
+            logger.warning(f"request with id {request_id} has a saving future left, but not in kvconnector metadata, ignore")
         self.saving_futures.clear()
 
     def get_num_new_matched_tokens(self, request, num_computed_tokens: int) -> tuple[int, bool]:
