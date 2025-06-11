@@ -295,11 +295,11 @@ class ChariotConnector(KVConnectorBase_V1):
             logger.warning(f"kvcache with id {kvcache_id} has a saving future left, but not in kvconnector metadata, ignore")
         self.saving_futures.clear()
 
-    def get_num_new_matched_tokens(self, request, num_computed_tokens: int) -> int:
+    def get_num_new_matched_tokens(self, request, num_computed_tokens: int) -> tuple[int, bool]:
         if self.is_producer:
-            return 0
+            return 0, False
         num_total_tokens = len(request.prompt_token_ids) - 1
-        return num_total_tokens - num_computed_tokens
+        return num_total_tokens - num_computed_tokens, True
 
     def update_state_after_alloc(self, request: "Request", num_external_tokens: int):
         if not self. is_producer:
