@@ -119,9 +119,6 @@ class ChariotFutureWrapper:
         if ret.error_message:
             logger.error(f"kvcache with id {self.kvcache_id} wait for save error: {ret.error_message}")
 
-    def __del__(self):
-        logger.debug(f"kvcache with id {self.kvcache_id} future object released.")
-
 
 class ChariotKvcacheStore:
     def __init__(self, device_id: int ,connection_timeout: int = CHARIOT_CONNECTION_TIMEOUT):
@@ -137,7 +134,7 @@ class ChariotKvcacheStore:
         self.client.init()
 
     def load(self, kvcache_id: str, kv_tensor: torch.Tensor):
-        return self.client.mget_h2d([kvcache_id], [kv_tensor])
+        return self.client.mget_h2d([kvcache_id], [kv_tensor], CHARIOT_KVCACHE_TIMEOUT)
     
     def save(self, kvcache_id: str, kv_tensor: torch.Tensor):
         return self.client.mset_d2h([kvcache_id], [kv_tensor])
@@ -223,9 +220,10 @@ class ChariotConnector(KVConnectorBase_V1):
                 kvcache_id = req_meta.generate_kvcache_id(layer_name, self.tp_rank) # type: ignore
                 if is_mla_attn:
                     kv_dim = math.prod(kv_layer.shape[2:])
+                    kv_holder = torch.zeros((seq_len, kv_dim), dtype=kv_dtype, device=self.device)
                 else:
                     kv_dim = math.prod(kv_layer.shape[3:])
-                kv_holder = torch.zeros((2, seq_len, kv_dim), dtype=kv_dtype, device=self.device)
+                    kv_holder = torch.zeros((2, seq_len, kv_dim), dtype=kv_dtype, device=self.device)
 
                 future = self.kv_store.load(kvcache_id, kv_holder) # type: ignore
                 chariot_future_wrapper = ChariotFutureWrapper(future, kvcache_id, kv_layer, kv_holder, req_meta.slot_mapping, is_mla_attn)
@@ -250,7 +248,7 @@ class ChariotConnector(KVConnectorBase_V1):
                 logger.warning(f"kvcache with id {kvcache_id} wait_for_layer_load failed to find future, skip")
             if not self.loading_futures[req_meta.request_id]:
                 self.loading_futures.pop(req_meta.request_id, None)
-                logger.debug(f"request with id {req_meta.request_id} finished all layer loading for")
+                logger.debug(f"request with id {req_meta.request_id} finished all layer loading")
 
     def save_kv_layer(self, layer_name: str, kv_layer: torch.Tensor, attn_metadata: "AttentionMetadata", **kwargs) -> None:
         if not self.is_producer:
@@ -314,7 +312,7 @@ class ChariotConnector(KVConnectorBase_V1):
     def update_state_after_alloc(self, request: "Request",
                                  blocks: "KVCacheBlocks",
                                  num_external_tokens: int):
-        if not self. is_producer:
+        if not self.is_producer:
             logger.debug(f"request with id {request.request_id} updated state to waiting for kvcache load")
             self.requests_waiting_for_load[request.request_id] = request
 
@@ -336,8 +334,10 @@ class ChariotConnector(KVConnectorBase_V1):
                 break
             if cached_req.req_id in self.requests_waiting_for_load:
                 total_tokens = len(cached_req.new_token_ids) + cached_req.num_computed_tokens
+                if total_tokens > self.requests_waiting_for_load[cached_req.req_id].num_prompt_tokens:
+                    logger.debug(f"just resumed from preempted request {cached_req.req_id} has already loaded kvcache, skip")
+                    continue
                 token_ids = self.requests_waiting_for_load[cached_req.req_id].all_token_ids[:total_tokens]
-
                 block_ids = cached_req.new_block_ids
                 kvconnector_metadata.add_load_request(request_id=cached_req.req_id,
                                                       token_ids=token_ids,
