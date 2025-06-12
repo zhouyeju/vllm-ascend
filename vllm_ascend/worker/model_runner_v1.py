@@ -991,10 +991,6 @@ class NPUModelRunner(LoRAModelRunnerMixin):
                                  self.vllm_config,
                                  num_tokens=num_input_tokens):
             with ProfileExecuteDuration().capture_async("forward"):
-                if has_kv_transfer_group():
-                    kvconnector = get_kv_transfer_group()
-                    kvconnector.bind_connector_metadata(scheduler_output.kv_connector_metadata)
-                    kvconnector.start_load_kv(get_forward_context())
                 model_kwargs = {}
                 if self.torchair_graph_enabled:
                     model_kwargs["kv_caches"] = self.kv_caches
@@ -1011,6 +1007,10 @@ class NPUModelRunner(LoRAModelRunnerMixin):
                     )
                 else:
                     assert self.model is not None
+                    if has_kv_transfer_group():
+                        kvconnector = get_kv_transfer_group()
+                        kvconnector.bind_connector_metadata(scheduler_output.kv_connector_metadata)
+                        kvconnector.start_load_kv(get_forward_context())
                     hidden_states = self.model(
                         input_ids=input_ids,
                         positions=positions,
@@ -1018,8 +1018,8 @@ class NPUModelRunner(LoRAModelRunnerMixin):
                         inputs_embeds=inputs_embeds,
                         **model_kwargs,
                     )
-                if has_kv_transfer_group():
-                    get_kv_transfer_group().wait_for_save()
+                    if has_kv_transfer_group():
+                        get_kv_transfer_group().wait_for_save()
 
         use_spec_decode = len(
             scheduler_output.scheduled_spec_decode_tokens) > 0

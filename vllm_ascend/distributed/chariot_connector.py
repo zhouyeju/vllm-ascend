@@ -182,7 +182,7 @@ class ChariotConnector(KVConnectorBase_V1):
         else:
             num_blocks, block_size = kv_layer_shape[1], kv_layer_shape[2]
             dst_kv_layer = dst_kv_layer.reshape(2, num_blocks * block_size, -1)
-            dst_kv_layer[slot_mapping, ...] = src_kv_layer
+            dst_kv_layer[:, slot_mapping, ...] = src_kv_layer
             dst_kv_layer = dst_kv_layer.reshape(kv_layer_shape)
 
     @staticmethod
