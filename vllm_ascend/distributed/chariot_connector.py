@@ -246,9 +246,11 @@ class ChariotConnector(KVConnectorBase_V1):
             chariot_future_wrapper = self.loading_futures[req_meta.request_id].pop(kvcache_id, None)
             if chariot_future_wrapper:
                 chariot_future_wrapper.wait_for_load()
-                self.loading_futures.pop(req_meta.request_id, None)
             else:
                 logger.warning(f"kvcache with id {kvcache_id} wait_for_layer_load failed to find future, skip")
+            if not self.loading_futures[req_meta.request_id]:
+                self.loading_futures.pop(req_meta.request_id, None)
+                logger.debug(f"request with id {req_meta.request_id} finished all layer loading for")
 
     def save_kv_layer(self, layer_name: str, kv_layer: torch.Tensor, attn_metadata: "AttentionMetadata", **kwargs) -> None:
         if not self.is_producer:
