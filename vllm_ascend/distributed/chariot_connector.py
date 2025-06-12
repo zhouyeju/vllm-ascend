@@ -198,7 +198,7 @@ class ChariotConnector(KVConnectorBase_V1):
 
     def start_load_kv(self, forward_context: "ForwardContext", **kwargs) -> None:
         if self.is_producer:
-            logger.warning("kv producer calls start_load_kv, skip")
+            logger.debug("kv producer calls start_load_kv, skip")
             return
         kvconnector_metadata: ChariotConnectorMetadata = self._get_connector_metadata() # type: ignore
         if kvconnector_metadata is None:
@@ -236,7 +236,7 @@ class ChariotConnector(KVConnectorBase_V1):
     def wait_for_layer_load(self, layer_name: str) -> None:
         kvconnector_metadata: ChariotConnectorMetadata = self._get_connector_metadata() # type: ignore
         if kvconnector_metadata is None:
-            logger.warning("kvconnector calls wait_for_layer_load, but the kvconnector metadata is None, skip")
+            logger.debug("kvconnector calls wait_for_layer_load, but the kvconnector metadata is None, skip")
             return
         for req_meta in kvconnector_metadata.loading_requests:
             if req_meta.request_id not in self.loading_futures:
@@ -254,7 +254,7 @@ class ChariotConnector(KVConnectorBase_V1):
 
     def save_kv_layer(self, layer_name: str, kv_layer: torch.Tensor, attn_metadata: "AttentionMetadata", **kwargs) -> None:
         if not self.is_producer:
-            logger.warning("kv consumer calls save_kv_layer, skip")
+            logger.debug("kv consumer calls save_kv_layer, skip")
             return
 
         if attn_metadata is None:
