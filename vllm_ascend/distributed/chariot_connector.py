@@ -309,7 +309,7 @@ class ChariotConnector(KVConnectorBase_V1):
         if self.is_producer:
             return 0, False
         num_total_tokens = len(request.prompt_token_ids) - 1
-        return num_total_tokens - num_computed_tokens, True
+        return num_total_tokens - num_computed_tokens, False
 
     def update_state_after_alloc(self, request: "Request",
                                  blocks: "KVCacheBlocks",
