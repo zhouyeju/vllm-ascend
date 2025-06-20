@@ -1,4 +1,6 @@
+import json
 import os
+import pytest
 import requests
 import signal
 import subprocess
@@ -90,12 +92,19 @@ def get_pids_by_keyword(keyword):
         return f"error occurred trying to get PIDs of processes containing keyword {keyword}"
 
 
-
-def test_chariot_pd_dist():
+@pytest.fixture
+def setup_and_clean_cluster():
     start_chariot()
     start_instances()
     start_proxy_server()
     time.sleep(3)
+    yield
+    clean_instances_and_proxy_server()
+    clean_chariot()
+
+
+def test_chariot_pd_dist():
+    
     proxy_url = f"http://{HOST_IP}:{PROXY_PORT}/v1/completions"
     for prompt, answer in PROMPT_ANSWER.items():
         data = {
@@ -104,7 +113,7 @@ def test_chariot_pd_dist():
             "max_tokens": 50,
             "temperature": 0
         }
-        response = send_post_request(proxy_url, data)
-        assert response == answer, f"wrong response: {response}, expected: {answer}"
-    clean_instances_and_proxy_server()
-    clean_chariot()
+        response_str = send_post_request(proxy_url, data)
+        response_json = json.loads(response_str)
+        output = response_json["choices"][0]["text"]
+        assert output == answer, f"wrong response: {response}, expected: {answer}"
