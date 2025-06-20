@@ -4,19 +4,21 @@ import signal
 import subprocess
 import time
 
+HOST_IP = "127.0.0.1"
+MODEL_NAME = "Qwen/Qwen2.5-7B"
 WORKSPACE_DIR = "./tests/e2e/pd_disaggreate/chariot/"
+
 RUN_INSTANCES_SCRIPT = os.path.join(WORKSPACE_DIR, "run_pd_with_chariot_connector.sh")
 RUN_PROXY_SERVER_SCRIPT = os.path.join(WORKSPACE_DIR, "run_proxy_server.sh")
 RUN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "run_chariot.sh")
 CLEAN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "clean_chariot.sh")
 PROXY_SERVER_SCRIPT = os.path.join(WORKSPACE_DIR, "simple_pd_proxy_server.py")
-HOST_IP = "127.0.0.1"
 PROXY_PORT = 8000
 PREFILL_PORT = 8100
 DECODE_PORT = 8200
 WORKER_PORT = 31530
 ETCD_PORT = 2411
-MODEL_NAME = "Qwen/Qwen2.5-7B"
+
 PROMPT_ANSWER = {
     "who is the president of the united states?": "?\nDonald Trump"
 }
