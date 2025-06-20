@@ -104,7 +104,6 @@ def setup_and_clean_cluster():
 
 
 def test_chariot_pd_dist():
-    
     proxy_url = f"http://{HOST_IP}:{PROXY_PORT}/v1/completions"
     for prompt, answer in PROMPT_ANSWER.items():
         data = {
