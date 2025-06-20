@@ -25,18 +25,22 @@ RUN_PROXY_SERVER_KEYWORDS = "simple_pd_proxy_server.py"
 
 def start_chariot():
     proc = subprocess.Popen(["bash", RUN_CHARIOT_SCRIPT, f"{HOST_IP}", f"{WORKER_PORT}", f"{ETCD_PORT}"])
+    proc.wait()
 
 
 def clean_chariot():
     proc = subprocess.Popen(["bash", CLEAN_CHARIOT_SCRIPT, f"{HOST_IP}", f"{WORKER_PORT}"])
+    proc.wait()
 
 
 def start_instances():
     proc = subprocess.Popen(["bash", RUN_INSTANCES_SCRIPT, f"{MODEL_NAME}", f"{HOST_IP}", f"{PREFILL_PORT}", f"{DECODE_PORT}"])
+    proc.wait()
 
 
 def start_proxy_server():
     proc = subprocess.Popen(["bash", RUN_PROXY_SERVER_SCRIPT, f"{HOST_IP}", f"{PROXY_PORT}", f"{PREFILL_PORT}", f"{DECODE_PORT}"])
+    proc.wait()
 
 
 def clean_instances_and_proxy_server():
@@ -91,6 +95,7 @@ def test_chariot_pd_dist():
     proxy_url = f"http://{HOST_IP}:{PROXY_PORT}/v1/competions"
     start_instances()
     start_proxy_server()
+    time.sleep(3)
     for prompt, answer in PROMPT_ANSWER.items():
         data = {
             "model": MODEL_NAME,
