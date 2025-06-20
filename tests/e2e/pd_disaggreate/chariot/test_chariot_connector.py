@@ -52,16 +52,25 @@ def clean_instances_and_proxy_server():
     instance_pids = get_pids_by_keyword(RUN_INSTANCE_KEYWORDS)
     proxy_pids = get_pids_by_keyword(RUN_PROXY_SERVER_KEYWORDS)
     for pid in proxy_pids + instance_pids:
+        pid = int(pid)
         try:
-            os.kill(pid, sig)
+            os.kill(pid, signal.SIGINT)
         except ProcessLookupError:
             print(f"No such process with PID {pid}")
         except PermissionError:
-            print(f"Permission denied to send signal to PID {pid}")
+            print(f"Permission denied to send SIGINT to PID {pid}")
         except Exception as e:
             print(f"Error: {e}")
-        time.sleep(5)
-        os.kill(pid, signal.SIGKILL)
+        time.sleep(3)
+        pid = int(pid)
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            print(f"No such process with PID {pid}")
+        except PermissionError:
+            print(f"Permission denied to send SIGKILL to PID {pid}")
+        except Exception as e:
+            print(f"Error: {e}")
 
 
 def send_post_request(url, data):
