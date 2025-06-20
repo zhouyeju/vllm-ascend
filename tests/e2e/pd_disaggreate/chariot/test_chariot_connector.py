@@ -95,10 +95,8 @@ def test_chariot_pd_dist():
     start_chariot()
     start_instances()
     start_proxy_server()
-    proxy_url = f"http://{HOST_IP}:{PROXY_PORT}/v1/competions"
-    start_instances()
-    start_proxy_server()
     time.sleep(3)
+    proxy_url = f"http://{HOST_IP}:{PROXY_PORT}/v1/competions"
     for prompt, answer in PROMPT_ANSWER.items():
         data = {
             "model": MODEL_NAME,
