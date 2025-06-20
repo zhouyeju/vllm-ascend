@@ -52,7 +52,7 @@ def clean_instances_and_proxy_server():
         except Exception as e:
             print(f"Error: {e}")
         time.sleep(5)
-        os.(pid, signal.SIGKILL)
+        os.kill(pid, signal.SIGKILL)
 
 
 def send_post_request(url, data):
