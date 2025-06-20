@@ -43,7 +43,8 @@ def clean_instances_and_proxy_server():
     instance_pids = get_pids_by_keyword(RUN_INSTANCE_KEYWORDS)
     proxy_pids = get_pids_by_keyword(RUN_PROXY_SERVER_KEYWORDS)
     for pid in proxy_pids + instance_pids:
-        os.kill(pid, sig)
+        try:
+            os.kill(pid, sig)
         except ProcessLookupError:
             print(f"No such process with PID {pid}")
         except PermissionError:
