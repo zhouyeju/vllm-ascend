@@ -9,6 +9,7 @@ RUN_INSTANCES_SCRIPT = os.path.join(WORKSPACE_DIR, "run_pd_with_chariot_connecto
 RUN_PROXY_SERVER_SCRIPT = os.path.join(WORKSPACE_DIR, "run_proxy_server.sh")
 RUN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "run_chariot.sh")
 CLEAN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "clean_chariot.sh")
+PROXY_SERVER_SCRIPT = os.path.join(WORKSPACE_DIR, "simple_pd_proxy_server.py")
 HOST_IP = "127.0.0.1"
 PROXY_PORT = 8000
 PREFILL_PORT = 8100
@@ -39,7 +40,7 @@ def start_instances():
 
 
 def start_proxy_server():
-    proc = subprocess.Popen(["bash", RUN_PROXY_SERVER_SCRIPT, f"{HOST_IP}", f"{PROXY_PORT}", f"{PREFILL_PORT}", f"{DECODE_PORT}"])
+    proc = subprocess.Popen(["bash", RUN_PROXY_SERVER_SCRIPT, PROXY_SERVER_SCRIPT, f"{HOST_IP}", f"{PROXY_PORT}", f"{PREFILL_PORT}", f"{DECODE_PORT}"])
     proc.wait()
 
 
