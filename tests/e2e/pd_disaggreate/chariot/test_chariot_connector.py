@@ -79,6 +79,8 @@ def get_pids_by_keyword(keyword):
                 matching_pids.append(pid)
 
         return matching_pids
+    except Exception as e:
+        return f"error occurred trying to get PIDs of processes containing keyword {keyword}"
 
 
 
