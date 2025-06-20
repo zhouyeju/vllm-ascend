@@ -5,10 +5,6 @@ HOST_IP=$2
 PREFILL_PORT=$3
 DECODE_PORT=$4
 
-cleanup() {
-    ...
-}
-
 if python -c "import datasystem" &> /dev/null; then
     echo "chariot-ds is already installed"
 else

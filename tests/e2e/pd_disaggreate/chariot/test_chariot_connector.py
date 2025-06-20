@@ -4,23 +4,31 @@ import signal
 import subprocess
 import time
 
-RUN_INSTANCES_SCRIPT = "./tests/e2e/pd_disaggreate/chariot/run_pd_with_chariot_connector.sh"
-RUN_PROXY_SERVER_SCRIPT = "./tests/e2e/pd_disaggreate/chariot/run_proxy_server.sh"
+WORKSPACE_DIR = "./tests/e2e/pd_disaggreate/chariot/"
+RUN_INSTANCES_SCRIPT = os.path.join(WORKSPACE_DIR, "run_pd_with_chariot_connector.sh")
+RUN_PROXY_SERVER_SCRIPT = os.path.join(WORKSPACE_DIR, "run_proxy_server.sh")
+RUN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "run_chariot.sh")
+CLEAN_CHARIOT_SCRIPT = os.path.join(WORKSPACE_DIR, "clean_chariot.sh")
 HOST_IP = "127.0.0.1"
 PROXY_PORT = 8000
 PREFILL_PORT = 8100
 DECODE_PORT = 8200
+WORKER_PORT = 31530
+ETCD_PORT = 2411
 MODEL_NAME = "Qwen/Qwen2.5-7B"
 PROMPT_ANSWER = {
     "who is the president of the united states?": "?\nDonald Trump"
 }
 RUN_INSTANCE_KEYWORDS = "vllm serve"
 RUN_PROXY_SERVER_KEYWORDS = "simple_pd_proxy_server.py"
-RUN_CHARIOT_COMMAND = "dscli start --worker_address localhost:31530 --master_address localhost:31531 --etcd_address localhost:2411"
-STOP_CHARIOT_COMMAND = "dscli stop --worker_address localhost:31530"
 
-def deploy_chariot_ds():
-    proc = subprocess.Popen(RUN_CHARIOT_COMMAND.split())
+
+def start_chariot():
+    proc = subprocess.Popen(["bash", RUN_CHARIOT_SCRIPT, f"{HOST_IP}", f"{WORKER_PORT}", f"{ETCD_PORT}"])
+
+
+def clean_chariot():
+    proc = subprocess.Popen(["bash", CLEAN_CHARIOT_SCRIPT, f"{HOST_IP}", f"{WORKER_PORT}"])
 
 
 def start_instances():
@@ -29,6 +37,21 @@ def start_instances():
 
 def start_proxy_server():
     proc = subprocess.Popen(["bash", RUN_PROXY_SERVER_SCRIPT, f"{HOST_IP}", f"{PROXY_PORT}", f"{PREFILL_PORT}", f"{DECODE_PORT}"])
+
+
+def clean_instances_and_proxy_server():
+    instance_pids = get_pids_by_keyword(RUN_INSTANCE_KEYWORDS)
+    proxy_pids = get_pids_by_keyword(RUN_PROXY_SERVER_KEYWORDS)
+    for pid in proxy_pids + instance_pids:
+        os.kill(pid, sig)
+        except ProcessLookupError:
+            print(f"No such process with PID {pid}")
+        except PermissionError:
+            print(f"Permission denied to send signal to PID {pid}")
+        except Exception as e:
+            print(f"Error: {e}")
+        time.sleep(5)
+        os.(pid, signal.SIGKILL)
 
 
 def send_post_request(url, data):
@@ -57,22 +80,11 @@ def get_pids_by_keyword(keyword):
         return matching_pids
 
 
-def clean():
-    instance_pids = get_pids_by_keyword(RUN_INSTANCE_KEYWORDS)
-    proxy_pids = get_pids_by_keyword(RUN_PROXY_SERVER_KEYWORDS)
-    for pid in proxy_pids + instance_pids:
-        os.kill(pid, sig)
-        except ProcessLookupError:
-            print(f"No such process with PID {pid}")
-        except PermissionError:
-            print(f"Permission denied to send signal to PID {pid}")
-        except Exception as e:
-            print(f"Error: {e}")
-        time.sleep(5)
-        os.(pid, signal.SIGKILL)
-
 
 def test_chariot_pd_dist():
+    start_chariot()
+    start_instances()
+    start_proxy_server()
     proxy_url = = f"http://{HOST_IP}:{PROXY_PORT}/v1/competions"
     start_instances()
     start_proxy_server()
@@ -85,5 +97,5 @@ def test_chariot_pd_dist():
         }
         response = send_post_request(proxy_url, data)
         assert response == answer, f"wrong response: {response}, expected: {answer}"
-
-    clean()
+    clean_instances_and_proxy_server()
+    clean_chariot()
