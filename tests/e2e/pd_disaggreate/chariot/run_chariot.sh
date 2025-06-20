@@ -18,6 +18,7 @@ etcd \
 
 
 dscli start \
+    -w \
     --worker_address ${HOST_IP}:${WORKER_PORT} \
     --master_address ${HOST_IP}}:${MASTER_PORT} \
     --etcd_address ${HOST_IP}:${ETCD_PORT} &
