@@ -6,7 +6,6 @@ from dllm.entities import Role, SchedulerPolicy
 required_vllm_options = [
     ("host", ),
     ("port", ),
-    ("model", ),
     ("tensor-parallel-size", "tp"),
     ("data-parallel-size", "dp"),
     ("data-parallel-size-local", "dpl"),
